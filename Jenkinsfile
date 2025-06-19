@@ -22,8 +22,7 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Construit l'image avec le Dockerfile du dépôt
-                    docker.build("${DOCKER_IMAGE}")
+                     sh "docker build -t ${DOCKER_IMAGE} ."
                 }
             }
         }
