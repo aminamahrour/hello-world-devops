@@ -49,13 +49,13 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                sshagent([ANSIBLE_SSH_CREDENTIALS]) {
+                sshagent(['ansible-ssh']) {
                     sh """
                         # Connexion SSH sécurisée sans vérification de host key
                         ssh -o StrictHostKeyChecking=no \
                             -o UserKnownHostsFile=/dev/null \
-                            ${ANSIBLE_USER}@${ANSIBLE_HOST} \
-                            'ansible-playbook /home/ubuntu/deploy.yml -e image_version=${DOCKER_IMAGE}'
+                             ubuntu@10.132.0.4 \
+                            'ansible-playbook /home/ubuntu/deploy.yml -e image_version=aminamahrour/hello-world:6'
                     """
                 }
             }
