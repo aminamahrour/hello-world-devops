@@ -1,28 +1,29 @@
 pipeline {
     agent any
-    
+
     environment {
-        // Configuration Docker
+        // Image Docker tag
         DOCKER_IMAGE = "aminamahrour/hello-world:${BUILD_NUMBER}"
         DOCKER_REGISTRY = "https://index.docker.io/v1/"
-        
-        // Configuration Ansible
-        ANSIBLE_USER = "aminamahrour"
-        ANSIBLE_HOST = "192.168.1.100"  // À remplacer par votre IP Ansible
-        ANSIBLE_SSH_CREDENTIALS = "ansible-ssh"  // Doit correspondre à l'ID dans Jenkins
+
+        // Ansible (VM)
+        ANSIBLE_USER = "ubuntu"
+        ANSIBLE_HOST = "10.132.0.4"  // IP interne ou publique correcte
+        ANSIBLE_SSH_CREDENTIALS = "ansible-ssh"  // ID exact défini dans Jenkins
     }
 
     stages {
+
         stage('Checkout Code') {
             steps {
-                checkout scm  // Récupère automatiquement le code du dépôt GitHub
+                checkout scm
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                     docker.build("${DOCKER_IMAGE}")
+                    docker.build("${DOCKER_IMAGE}")
                 }
             }
         }
@@ -37,10 +38,7 @@ pipeline {
                     )
                 ]) {
                     sh """
-                        # Connexion sécurisée à Docker Hub
                         docker login -u "${DOCKER_USER}" -p "${DOCKER_PASS}" ${DOCKER_REGISTRY}
-                        
-                        # Push de l'image
                         docker push "${DOCKER_IMAGE}"
                     """
                 }
@@ -49,13 +47,11 @@ pipeline {
 
         stage('Deploy to Kubernetes') {
             steps {
-                sshagent(['ansible-ssh']) {
+                sshagent([env.ANSIBLE_SSH_CREDENTIALS]) {
                     sh """
-                        # Connexion SSH sécurisée sans vérification de host key
-                        ssh -o StrictHostKeyChecking=no \
-                            -o UserKnownHostsFile=/dev/null \
-                             ubuntu@10.132.0.4 \
-                            'ansible-playbook /home/ubuntu/deploy.yml -e image_version=aminamahrour/hello-world:6'
+                        ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null \
+                        ${ANSIBLE_USER}@${ANSIBLE_HOST} \
+                        'ansible-playbook /home/ubuntu/deploy.yml -e image_version=${DOCKER_IMAGE}'
                     """
                 }
             }
@@ -64,22 +60,21 @@ pipeline {
 
     post {
         always {
-            // Nettoyage sécurisé
             sh 'docker logout ${DOCKER_REGISTRY}'
-            cleanWs()  // Nettoie l'espace de travail Jenkins
+            cleanWs()
         }
+
         success {
-            // Notification en cas de succès (requiert plugin Slack)
             slackSend(
-                color: 'good', 
-                message: "SUCCESS: Pipeline ${BUILD_NUMBER} - ${env.JOB_NAME}"
+                color: 'good',
+                message: "✅ SUCCESS: Pipeline #${BUILD_NUMBER} - ${env.JOB_NAME}"
             )
         }
+
         failure {
-            // Notification en cas d'échec
             slackSend(
                 color: 'danger',
-                message: "FAILED: Pipeline ${BUILD_NUMBER} - ${env.JOB_NAME}"
+                message: "❌ FAILURE: Pipeline #${BUILD_NUMBER} - ${env.JOB_NAME}"
             )
         }
     }
